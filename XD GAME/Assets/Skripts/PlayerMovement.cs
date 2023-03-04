@@ -6,23 +6,34 @@ public class PlayerMovement : MonoBehaviour
 {
 
     [Header("Movement")]
-    public float moveSpeed;
+    private float moveSpeed;
+    public float walkSpeed;
+    public float sprintSpeed;
 
     public float groundDrag;
 
-    public float jumpForce;
+    [Header("Jumping")]
+    public float jumpForce; 
     public float jumpCooldown;
     public float airMultiplier;
     bool readyToJump;
 
+    [Header("Crouching")]
+    public float crouchSpeed;
+    public float crouchYScale;
+    private float startYScale;
 
     [Header("Keybinds")]
     public KeyCode jumpKey = KeyCode.Space;
+    public KeyCode sprintKey = KeyCode.LeftShift;
+    public KeyCode crouchKey;
 
     [Header("Ground Check")]
     public float playerHeight;
-    public LayerMask whatisGround;
-    bool grounded;
+    public LayerMask WhatIsGround;
+    public bool grounded;
+
+
 
 
     public Transform orientation;
@@ -33,23 +44,35 @@ public class PlayerMovement : MonoBehaviour
     Vector3 moveDirection;
     Rigidbody rb;
 
+    public MovementState state;
+
+    public enum MovementState
+    {
+        walking,
+        crouching,
+        sprinting,
+        air
+    }
+
 
     // Start is called before the first frame update
     void Start()
     {
         rb = GetComponent<Rigidbody>();
         rb.freezeRotation = true;
-        
+        ResetJump();
+
+        startYScale = transform.localScale.y;
     }
 
     void Update()
     {
-        grounded = Physics.Raycast(transform.position, Vector3.down, playerHeight * 0.5f + 0.2f, whatisGround);
-
+      
+        grounded = Physics.Raycast(transform.position + new Vector3(0, 1f, 0), Vector3.down, playerHeight*0.5f+0.3f, WhatIsGround);
 
         MyInput();
         SpeedControl(); 
-
+        StateHandler();
 
         //handle Drag
         if(grounded)
@@ -64,7 +87,7 @@ public class PlayerMovement : MonoBehaviour
 
     void FixedUpdate()
     {
-        MovePlayer();   
+        MovePlayer();
     }
 
 
@@ -74,17 +97,49 @@ public class PlayerMovement : MonoBehaviour
         horizontalInput = Input.GetAxisRaw("Horizontal");
         verticalInput = Input.GetAxisRaw("Vertical");
 
-
         //when to jump
         if (Input.GetKey(jumpKey) && readyToJump && grounded)
         {
             readyToJump = false;
-
             Jump();
-
             Invoke(nameof(ResetJump), jumpCooldown);
 
 
+        }
+        //start to crouch
+        if (Input.GetKeyDown(crouchKey)){
+            transform.localScale = new Vector3 (transform.localScale.x , crouchYScale , transform.localScale.z);
+            rb.AddForce(Vector3.down * 3, ForceMode.Impulse);   
+        }
+        //stop to crouch
+        if (Input.GetKeyUp(crouchKey))
+        {
+            transform.localScale = new Vector3(transform.localScale.x, startYScale, transform.localScale.z);
+        }
+
+    }
+
+    private void StateHandler()
+    {
+   
+
+        if (grounded && Input.GetKey(sprintKey)){
+            state = MovementState.sprinting;
+            moveSpeed = sprintSpeed;
+        }
+        else if (grounded && Input.GetKey(crouchKey))
+        {
+            state = MovementState.crouching;
+            moveSpeed = crouchSpeed;
+        }
+        else if (grounded)
+        {
+            state = MovementState.walking;
+            moveSpeed = walkSpeed;
+        }
+        else
+        {
+            state = MovementState.air;
         }
 
     }
